@@ -1,0 +1,89 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Hackathon App",
+  "Parameters": {
+  },
+  "Resources": {
+    "ElasticIntakeRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": [
+                  "lambda.amazonaws.com"
+                ]
+              },
+              "Action": [
+                "sts:AssumeRole"
+              ]
+            }
+          ]
+        },
+        "ManagedPolicyArns": [
+        ],
+        "Path": "/",
+        "Policies": [
+          {
+            "PolicyName": "readReleaseBucket",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "*"
+                  ],
+                  "Resource": "*"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "ElasticsearchDomain": {
+      "Type": "AWS::Elasticsearch::Domain",
+      "Properties": {
+        "ElasticsearchClusterConfig": {
+          "DedicatedMasterEnabled": "false",
+          "InstanceCount": "2",
+          "ZoneAwarenessEnabled": "true",
+          "InstanceType": "m3.medium.elasticsearch"
+        },
+        "EBSOptions": {
+          "EBSEnabled": false
+        },
+        "SnapshotOptions": {
+          "AutomatedSnapshotStartHour": "0"
+        },
+        "AccessPolicies": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Fn::GetAtt": [
+                    "ElasticIntakeRole",
+                    "Arn"
+                  ]
+                }
+              },
+              "Action": "es:*",
+              "Resource": "*"
+            }
+          ]
+        },
+        "AdvancedOptions": {
+          "rest.action.multi.allow_explicit_index": "true"
+        }
+      }
+    }
+  },
+  "Outputs": {
+  }
+}
