@@ -1,0 +1,14 @@
+{
+  "name": "smart-ingest-lambda",
+  "version": "0.0.1",
+  "private": false,
+  "dependencies": {},
+  "devDependencies": {
+    "chai": "^3.5.0",
+    "mocha": "^3.2.0"
+  },
+  "scripts": {
+    "test": "mocha *.spec.js",
+    "testWatch": "mocha --watch *.spec.js"
+  }
+}
