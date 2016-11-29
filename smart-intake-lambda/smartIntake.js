@@ -2,7 +2,9 @@ var _ = require("lodash"),
   moment = require("moment"),
   AWS = require("aws-sdk"),
 
-  callSmart = require('./callSmart');
+  callSmart = require('./callSmart'),
+
+  S3_BUCKET_NAME = "myBucket";
 
 /**
  * Intake SMART data.
@@ -39,21 +41,61 @@ exports.intakeMain = function(event, context, callback) {
 
       Promise.all(descriptorPromises).then(
         function(allResults) {
-          _.forEach(allResults,
-            /**
-             * @param {QueryResults} queryResult
-             * @param {number} index which descriptor from queriesWeWant the result belongs to
-             */
-            function(queryResult, index) {
-              console.log("for query name: " + queriesWeWant[index].name);
-              console.log(queryResult.parsedJson);
-              //
-              // var params = {Bucket: 'myBucket', Key: 'myKey', Body: 'Hello!'};
-              //
-              // s3.putObject(params, function(err, data) {
+          var s3 = new AWS.S3({
+            apiVersion: '2006-03-01',
+            params: {Bucket: S3_BUCKET_NAME}
+          });
+
+          var resultsByType = _.map(allResults, function(aResult, index) {
+            return {
+              type: queriesWeWant[index].name.replace(/ /g, "_"),
+              resultSet: aResult.parsedJson  // this is a json array of records
+            }
+          });
+
+          // sanitize the data and make a row per result
+          var resultsByRow = _.flatMap(resultsByType, function(byType) {
+            // denormalize, store the record type with the parsed json from the resultSet
+            return _.map(byType.resultSet, function(parsedJson) {
+              return {
+                type: byType.type,
+                result: _.transform(parsedJson, function(output, value, key) {
+                  output[key.replace(/ /g, "_").toLowerCase()] = value;
+                }, {})
+              };
+            });
+          });
+
+          // put each record that we read from SMART to S3 as its own file under a random UUID
+          var putPromises = _.map(resultsByRow,
+            function(row) {
+              console.log(row);
+
+              return new Promise(function(resolve, reject) {
+                resolve();
+              });
+
+              // return new Promise(function(resolve, reject) {
+              //   s3.putObject({
+              //     Bucket: S3_BUCKET_NAME,
+              //     Key:
+              //   }, function(err, data) {
+              //     if(!err) {
+              //       resolve();
+              //     }
+              //     else {
+              //       reject(err);
+              //     }
+              //   });
+              // });
             });
 
-          callback(null, "Success!!");
+          Promise.all(putPromises, function() {
+            callback(null, "Success!!");
+          },
+          function(error) {
+            callback(error);
+          });
         },
         function(error) {
           callback(error);

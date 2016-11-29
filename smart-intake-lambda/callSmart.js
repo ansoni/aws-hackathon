@@ -115,7 +115,7 @@ function retrieveQueryDateRange(queryUuid, userName, password, startDate, endDat
               resolve({
                 forUuid: queryUuid,
                 rawData: rawCsv,
-                parsedJson: result,
+                parsedJson: result[0],  // assuming converter always emits an array of 1 containing our array of rows??
                 httpHeaders: httpResponse.headers
               });
             }
