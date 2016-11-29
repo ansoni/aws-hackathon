@@ -8,7 +8,8 @@
 #   where profile_name is defined in your ~/.aws/credentials file
 
 rm smart-intake.zip
-zip smart-intake.zip package.json smartIntake.js callSmart.js
+npm install
+zip -r smart-intake.zip package.json smartIntake.js callSmart.js node_modules
 
 aws lambda update-function-code \
 --region us-west-2 \

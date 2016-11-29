@@ -1,10 +1,11 @@
 var _ = require("lodash"),
   moment = require("moment"),
   AWS = require("aws-sdk"),
+  UUID = require("uuid"),
 
   callSmart = require('./callSmart'),
 
-  S3_BUCKET_NAME = "myBucket";
+  S3_BUCKET_NAME = "hackwcs-team37-test";
 
 /**
  * Intake SMART data.
@@ -32,7 +33,10 @@ exports.intakeMain = function(event, context, callback) {
   callSmart.retrieveAllQueriesPossible(userName, password).then(
     function(allQueryTypes) {
       var queriesWeWant = _.filter(allQueryTypes.allQueries, function(queryDescriptor) {
-        return queryDescriptor.name === "Wildlife" || queryDescriptor.name === "All Observations";
+        return queryDescriptor.name === "Wildlife" ||
+          queryDescriptor.name === "All Observations" ||
+          queryDescriptor.name === "Weapons and Gear Seized " ||
+          queryDescriptor.name === "People Direct Observation";
       });
 
       var descriptorPromises = _.map(queriesWeWant, function(queryDescriptor) {
@@ -48,7 +52,7 @@ exports.intakeMain = function(event, context, callback) {
 
           var resultsByType = _.map(allResults, function(aResult, index) {
             return {
-              type: queriesWeWant[index].name.replace(/ /g, "_"),
+              type: queriesWeWant[index].name.replace(/ /g, "_").toLowerCase().trim(),
               resultSet: aResult.parsedJson  // this is a json array of records
             }
           });
@@ -66,34 +70,57 @@ exports.intakeMain = function(event, context, callback) {
             });
           });
 
-          // put each record that we read from SMART to S3 as its own file under a random UUID
-          var putPromises = _.map(resultsByRow,
-            function(row) {
-              console.log(row);
+          function putRow(row) {
+            return new Promise(function(resolve, reject) {
+              var fileKey = row.type + "-" + UUID.v4();
+              console.log("  Putting " + fileKey + " object to S3");
 
-              return new Promise(function(resolve, reject) {
-                resolve();
+              s3.putObject({
+                Bucket: S3_BUCKET_NAME,
+                Key: fileKey,
+                Body: JSON.stringify(row.result, null, ""),
+                ContentType: "application/json"
+              }, function(err, data) {
+                if(!err) {
+                  console.log("    - put successful");
+                  resolve();
+                }
+                else {
+                  console.log(err);
+                  reject(err);
+                }
               });
-
-              // return new Promise(function(resolve, reject) {
-              //   s3.putObject({
-              //     Bucket: S3_BUCKET_NAME,
-              //     Key:
-              //   }, function(err, data) {
-              //     if(!err) {
-              //       resolve();
-              //     }
-              //     else {
-              //       reject(err);
-              //     }
-              //   });
-              // });
             });
+          }
 
-          Promise.all(putPromises, function() {
-            callback(null, "Success!!");
-          },
-          function(error) {
+          var completedPromise = new Promise(function(resolve, reject) {
+            // put each record that we read from SMART to S3 as its own file under a random UUID
+            function putRows(rows) {
+              // if there are no more rows, resolve and return the completedPromise immediately
+              if(!rows.length) {
+                resolve();
+                return;
+              }
+
+              // put the 0th row, wait for it to finish
+              putRow(rows[0]).then(function() {
+                rows.shift();
+                putRows(rows);
+              },
+              function(error) {
+                reject(error);
+              });
+            }
+
+            console.log("Putting " + resultsByRow.length + " rows to S3");
+
+            putRows(resultsByRow);
+          });
+
+          completedPromise.then(function() {
+            callback(null, "success!!");
+          }, function(error) {
+            console.log("An error occurred: " + error);
             callback(error);
           });
         },
