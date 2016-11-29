@@ -1,3 +1,9 @@
+var _ = require("lodash"),
+  moment = require("moment"),
+  AWS = require("aws-sdk"),
+
+  callSmart = require('./callSmart');
+
 /**
  * Intake SMART data.
  *
@@ -16,7 +22,47 @@
  */
 
 exports.intakeMain = function(event, context, callback) {
-  console.log("we got here!!");
+  var userName = "hackathon";
+  var password = "a1SL!HV0";
+  var startDate = moment("2012-01-01", "YYYY-MM-DD").toDate();
+  var endDate = Date.now();
 
-  callback(null, "Success message!!");
+  callSmart.retrieveAllQueriesPossible(userName, password).then(
+    function(allQueryTypes) {
+      var queriesWeWant = _.filter(allQueryTypes.allQueries, function(queryDescriptor) {
+        return queryDescriptor.name === "Wildlife" || queryDescriptor.name === "All Observations";
+      });
+
+      var descriptorPromises = _.map(queriesWeWant, function(queryDescriptor) {
+        return callSmart.retrieveQueryDateRange(queryDescriptor.uuid, userName, password, startDate, endDate);
+      });
+
+      Promise.all(descriptorPromises).then(
+        function(allResults) {
+          _.forEach(allResults,
+            /**
+             * @param {QueryResults} queryResult
+             * @param {number} index which descriptor from queriesWeWant the result belongs to
+             */
+            function(queryResult, index) {
+              console.log("for query name: " + queriesWeWant[index].name);
+              console.log(queryResult.parsedJson);
+              //
+              // var params = {Bucket: 'myBucket', Key: 'myKey', Body: 'Hello!'};
+              //
+              // s3.putObject(params, function(err, data) {
+            });
+
+          callback(null, "Success!!");
+        },
+        function(error) {
+          callback(error);
+        }
+      );
+    },
+    function(error) {
+      callback(error);
+    }
+  );
+
 };
